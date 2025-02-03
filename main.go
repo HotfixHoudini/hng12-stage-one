@@ -39,7 +39,7 @@ func main() {
 
 	r.GET("/api/classify-number", classifyNumber)
 
-	if err := r.Run(":3001"); err != nil {
+	if err := r.Run(":8080"); err != nil {
 		log.Fatal(err)
 	}
 }
