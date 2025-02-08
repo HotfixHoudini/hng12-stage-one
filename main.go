@@ -47,7 +47,7 @@ func main() {
 func classifyNumber(c *gin.Context) {
 	numberStr := c.Query("number")
 	if numberStr == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"number": "invalid input", "error": true})
+		c.JSON(http.StatusBadRequest, gin.H{"number": "", "error": true})
 		return
 	}
 
@@ -84,7 +84,7 @@ func classifyNumber(c *gin.Context) {
 
 	response := Response{
 		Number:     parsedNumber,
-		IsPrime:    isPrime(positiveNumber),
+		IsPrime:    isPrime(parsedNumber),
 		IsPerfect:  isPerfect(positiveNumber),
 		Properties: numberProperties,
 		DigitSum:   sumOfDigits(positiveNumber),
