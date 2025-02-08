@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"strconv"
 
@@ -25,12 +26,11 @@ const NUMBERS_API_URL = "http://numbersapi.com"
 func main() {
 	r := gin.Default()
 
-	// Enable CORS for all routes (or you can customize it further)
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"},                                // Allow all origins, or specify specific domains
-		AllowMethods:     []string{"GET", "POST"},                      // Allow specific HTTP methods
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept"}, // Allow specific headers
-		AllowCredentials: true,                                         // Allow cookies (if necessary)
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "POST"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept"},
+		AllowCredentials: true,
 	}))
 
 	r.GET("/", func(c *gin.Context) {
@@ -39,14 +39,59 @@ func main() {
 
 	r.GET("/api/classify-number", classifyNumber)
 
-	if err := r.Run(":8080"); err != nil {
+	if err := r.Run(":8081"); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func isValidNumber(num string) bool {
-	_, err := strconv.Atoi(num)
-	return err == nil
+func classifyNumber(c *gin.Context) {
+	numberStr := c.Query("number")
+	if numberStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"number": "invalid input", "error": true})
+		return
+	}
+
+	number, err := strconv.ParseFloat(numberStr, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   true,
+			"number":  numberStr,
+			"message": "Invalid number format",
+		})
+		return
+	}
+
+	// Convert negative numbers to positive
+	var positiveNumber int
+
+	parsedNumber := int(number)
+	if number < 0 {
+		positiveNumber = int(math.Abs(number)) // Convert to int
+	} else {
+		positiveNumber = parsedNumber
+	}
+
+	funcFact, err := fetchFunFact(parsedNumber)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   true,
+			"message": fmt.Sprintf("Error fetching from Numbers API: %s", err.Error()),
+		})
+		return
+	}
+
+	numberProperties := getNumberProperties(positiveNumber)
+
+	response := Response{
+		Number:     parsedNumber,
+		IsPrime:    isPrime(positiveNumber),
+		IsPerfect:  isPerfect(positiveNumber),
+		Properties: numberProperties,
+		DigitSum:   sumOfDigits(positiveNumber),
+		FunFact:    funcFact,
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 func fetchFunFact(num int) (string, error) {
@@ -59,58 +104,6 @@ func fetchFunFact(num int) (string, error) {
 	}
 
 	return response.String(), nil
-}
-
-func isArmstrong(num int) bool {
-	digits := intToDigits(num)
-	power := len(digits)
-
-	sum := 0
-
-	for _, digit := range digits {
-		sum += intPow(digit, power)
-	}
-	return sum == num
-}
-
-func classifyNumber(c *gin.Context) {
-	number := c.Query("number")
-
-	if number == "" || !isValidNumber(number) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": true})
-		return
-	}
-
-	parsedNumber, err := strconv.Atoi(number)
-	if err != nil || parsedNumber < 0 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   true,
-			"message": "Number must be a positive integer",
-		})
-
-		return
-	}
-
-	funcFact, err := fetchFunFact(parsedNumber)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   true,
-			"message": fmt.Sprintf("Error fetching from Numbers API: %s", err.Error()),
-		})
-		return
-	}
-	numberProperties := getNumberProperties(parsedNumber)
-
-	response := Response{
-		Number:     parsedNumber,
-		IsPrime:    isPrime(parsedNumber),
-		IsPerfect:  isPerfect(parsedNumber),
-		Properties: numberProperties,
-		DigitSum:   sumOfDigits(parsedNumber),
-		FunFact:    funcFact,
-	}
-
-	c.JSON(http.StatusOK, response)
 }
 
 func getNumberProperties(num int) []string {
@@ -152,6 +145,16 @@ func isPerfect(num int) bool {
 		}
 	}
 	return sum == num && num != 1
+}
+
+func isArmstrong(num int) bool {
+	digits := intToDigits(num)
+	power := len(digits)
+	sum := 0
+	for _, digit := range digits {
+		sum += intPow(digit, power)
+	}
+	return sum == num
 }
 
 func sumOfDigits(num int) int {
